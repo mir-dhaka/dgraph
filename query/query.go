@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/RoaringBitmap/roaring/roaring64"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
@@ -288,7 +289,9 @@ type SubGraph struct {
 
 	// destUIDs is a list of destination UIDs, after applying filters, pagination.
 	DestMap *roaring64.Bitmap
-	List    bool // whether predicate is of list type
+
+	OrderedUIDs *pb.List
+	List        bool // whether predicate is of list type
 
 	pathMeta *pathMetadata
 }
@@ -922,7 +925,10 @@ func createTaskQuery(sg *SubGraph) (*pb.Query, error) {
 		First:        first,
 	}
 
-	if sg.SrcUIDs != nil {
+	if sg.OrderedUIDs != nil {
+		glog.Info("Creating task query sg.OrderedUIDs", sg.OrderedUIDs.Uids)
+		out.UidList = sg.OrderedUIDs
+	} else if sg.SrcUIDs != nil {
 		out.UidList = sg.SrcUIDs
 	}
 	return out, nil
@@ -971,9 +977,10 @@ func calculateFirstN(sg *SubGraph) int32 {
 // TODO(pawan) - Come back to this and document what do individual fields mean and when are they
 // populated.
 type varValue struct {
-	UidMap *roaring64.Bitmap // list of uids if this denotes a uid variable.
-	Vals   map[uint64]types.Val
-	path   []*SubGraph // This stores the subgraph path from root to var definition.
+	OrderedUIDs *pb.List
+	UidMap      *roaring64.Bitmap // list of uids if this denotes a uid variable.
+	Vals        map[uint64]types.Val
+	path        []*SubGraph // This stores the subgraph path from root to var definition.
 	// strList stores the valueMatrix corresponding to a predicate and is later used in
 	// expand(val(x)) query.
 	strList []*pb.ValueList
@@ -1432,10 +1439,11 @@ func (sg *SubGraph) populateUidValVar(doneVars map[string]varValue, sgPath []*Su
 
 		// This implies it is a value variable.
 		doneVars[sg.Params.Var] = varValue{
-			Vals:    make(map[uint64]types.Val),
-			path:    sgPath,
-			strList: sg.valueMatrix,
-			UidMap:  roaring64.New(),
+			OrderedUIDs: sg.OrderedUIDs,
+			Vals:        make(map[uint64]types.Val),
+			path:        sgPath,
+			strList:     sg.valueMatrix,
+			UidMap:      roaring64.New(),
 		}
 		for idx, uid := range sg.SrcUIDs.Uids {
 			val := types.Val{
@@ -1450,10 +1458,11 @@ func (sg *SubGraph) populateUidValVar(doneVars map[string]varValue, sgPath []*Su
 		// math.MaxUint64 which isn't entirely correct as there could be an actual uid with that
 		// value.
 		doneVars[sg.Params.Var] = varValue{
-			Vals:    make(map[uint64]types.Val),
-			path:    sgPath,
-			strList: sg.valueMatrix,
-			UidMap:  roaring64.New(),
+			OrderedUIDs: sg.OrderedUIDs,
+			Vals:        make(map[uint64]types.Val),
+			path:        sgPath,
+			strList:     sg.valueMatrix,
+			UidMap:      roaring64.New(),
 		}
 
 		// Because we are counting the number of UIDs in parent
@@ -1480,19 +1489,23 @@ func (sg *SubGraph) populateUidValVar(doneVars map[string]varValue, sgPath []*Su
 		// Uid variable could be defined using uid or a predicate.
 		var uids *roaring64.Bitmap
 		if sg.Attr == "uid" {
+			glog.Info("UIDS here is: ", codec.FromList(sg.SrcUIDs))
 			uids = codec.FromList(sg.SrcUIDs)
 		} else {
 			// Avoid an upfront Clone.
 			sg.DestMap.SetCopyOnWrite(true)
 			uids = sg.DestMap
+			glog.Info("UIDS here is: ", uids.ToArray())
+			glog.Info("orderedUIds are", sg.OrderedUIDs)
 		}
 
 		if v, ok = doneVars[sg.Params.Var]; !ok {
 			doneVars[sg.Params.Var] = varValue{
-				UidMap:  uids,
-				path:    sgPath,
-				Vals:    make(map[uint64]types.Val),
-				strList: sg.valueMatrix,
+				OrderedUIDs: sg.OrderedUIDs,
+				UidMap:      uids,
+				path:        sgPath,
+				Vals:        make(map[uint64]types.Val),
+				strList:     sg.valueMatrix,
 			}
 			return nil
 		}
@@ -1532,10 +1545,11 @@ func (sg *SubGraph) populateUidValVar(doneVars map[string]varValue, sgPath []*Su
 		}
 		// Insert a empty entry to keep the dependency happy.
 		doneVars[sg.Params.Var] = varValue{
-			path:    sgPath,
-			Vals:    make(map[uint64]types.Val),
-			strList: sg.valueMatrix,
-			UidMap:  roaring64.NewBitmap(),
+			OrderedUIDs: sg.OrderedUIDs,
+			path:        sgPath,
+			Vals:        make(map[uint64]types.Val),
+			strList:     sg.valueMatrix,
+			UidMap:      roaring64.NewBitmap(),
 		}
 	}
 	return nil
@@ -1681,6 +1695,7 @@ func (sg *SubGraph) fillVars(mp map[string]varValue) error {
 		}
 	}
 
+	var lists []*pb.List
 	out := roaring64.New()
 	// Go through all the variables in NeedsVar and see if we have a value for them in the map. If
 	// we do, then we store that value in the appropriate variable inside SubGraph.
@@ -1699,7 +1714,6 @@ func (sg *SubGraph) fillVars(mp map[string]varValue) error {
 
 		case (v.Typ == gql.UidVar && sg.SrcFunc != nil && sg.SrcFunc.Name == "uid_in"):
 			srcFuncArgs := sg.SrcFunc.Args[:0]
-
 			itr := l.UidMap.Iterator()
 			for itr.HasNext() {
 				uid := itr.Next()
@@ -1710,6 +1724,9 @@ func (sg *SubGraph) fillVars(mp map[string]varValue) error {
 			sg.SrcFunc.Args = srcFuncArgs
 
 		case (v.Typ == gql.AnyVar || v.Typ == gql.UidVar) && !l.UidMap.IsEmpty():
+			if l.OrderedUIDs != nil {
+				lists = append(lists, l.OrderedUIDs)
+			}
 			out.Or(l.UidMap)
 
 		case (v.Typ == gql.AnyVar || v.Typ == gql.ValueVar):
@@ -1740,6 +1757,14 @@ func (sg *SubGraph) fillVars(mp map[string]varValue) error {
 		out.Or(sg.DestMap)
 	}
 
+	spew.Dump(lists)
+	if lists != nil {
+		sg.OrderedUIDs = algo.MergeSorted(lists)
+	}
+	glog.Info("RETURNING AFTER FILLING ", out.ToArray())
+	if sg.OrderedUIDs != nil {
+		glog.Info("RETURNING LIST ", sg.OrderedUIDs.Uids)
+	}
 	sg.DestMap = out
 	return nil
 }
@@ -2032,7 +2057,11 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 			sg.DestMap = codec.FromList(sg.SrcUIDs)
 		} else {
 			// Populated variable.
-			sg.uidMatrix = []*pb.List{codec.ToList(sg.DestMap)}
+			if sg.OrderedUIDs != nil {
+				sg.uidMatrix = []*pb.List{sg.OrderedUIDs}
+			} else {
+				sg.uidMatrix = []*pb.List{codec.ToList(sg.DestMap)}
+			}
 		}
 		if sg.Params.AfterUID > 0 {
 			sg.DestMap.RemoveRange(0, sg.Params.AfterUID+1)
@@ -2047,6 +2076,7 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 				rch <- err
 				return
 			}
+			glog.Info("INTERSECTING sg.DestMap and sg.SrcMap")
 			codec.And(sg.DestMap, sg.SrcUIDs)
 			rch <- nil
 			return
@@ -2097,6 +2127,7 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 				rch <- err
 				return
 			}
+			x.SPEW.Dump("TaskQuery is", taskQuery)
 			result, err := worker.ProcessTaskOverNetwork(ctx, taskQuery)
 			switch {
 			case err != nil && strings.Contains(err.Error(), worker.ErrNonExistentTabletMessage):
@@ -2728,9 +2759,12 @@ func (req *Request) ProcessQuery(ctx context.Context) (err error) {
 	for i := 0; i < len(req.Subgraphs) && numQueriesDone < len(req.Subgraphs); i++ {
 		errChan := make(chan error, len(req.Subgraphs))
 		var idxList []int
+
+		glog.Info("LOOPING FOR SUBGRAPH: ", i, " ATTR ", req.Subgraphs[0].Attr)
 		// If we have N blocks in a query, it can take a maximum of N iterations for all of them
 		// to be executed.
 		for idx := 0; idx < len(req.Subgraphs); idx++ {
+			glog.Info("INNER LOOP FOR SUBGRAPH: ", i, " ATTR ", req.Subgraphs[0].Attr, " idx: ", idx)
 			if hasExecuted[idx] {
 				continue
 			}
@@ -2759,16 +2793,20 @@ func (req *Request) ProcessQuery(ctx context.Context) (err error) {
 			switch {
 			case sg.Params.Alias == "shortest":
 				// We allow only one shortest path block per query.
+				glog.Info("Called shortest")
 				go func() {
 					shortestSg, err = shortestPath(ctx, sg)
 					errChan <- err
 				}()
 			case sg.Params.Recurse:
+				glog.Info("Called recurse")
 				go func() {
 					errChan <- recurse(ctx, sg)
 				}()
 			default:
+				// x.SPEW.Dump("SUBGRAPH before ======================================", sg)
 				go ProcessGraph(ctx, sg, nil, errChan)
+				// x.SPEW.Dump("SUBGRAPH after ======================================", sg)
 			}
 		}
 
@@ -2788,6 +2826,7 @@ func (req *Request) ProcessQuery(ctx context.Context) (err error) {
 		for _, idx := range idxList {
 			sg := req.Subgraphs[idx]
 
+			glog.Info("Populating vars for idx: ", idx)
 			var sgPath []*SubGraph
 			if err := sg.populateVarMap(req.Vars, sgPath); err != nil {
 				return err

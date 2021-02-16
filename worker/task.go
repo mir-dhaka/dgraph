@@ -1125,7 +1125,7 @@ func (qs *queryState) handleRegexFunction(ctx context.Context, arg funcArgs) err
 		useIndex, arg.srcFn.isFuncAtRoot)
 
 	query := cindex.RegexpQuery(arg.srcFn.regex.Syntax)
-	var uids *roaring64.Bitmap
+	uids := roaring64.New()
 
 	// Here we determine the list of uids to match.
 	switch {
@@ -2278,6 +2278,7 @@ func (qs *queryState) evaluate(cp countParams, out *pb.Result) error {
 		if err != nil {
 			return err
 		}
+		x.SPEW.Dump("COUNT UIDS:", uids)
 		out.UidMatrix = append(out.UidMatrix, uids)
 		return nil
 	}

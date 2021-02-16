@@ -522,6 +522,8 @@ func (l *List) Bitmap(opt ListOptions) (*roaring64.Bitmap, error) {
 func (l *List) bitmap(opt ListOptions) (*roaring64.Bitmap, error) {
 	deleteBelow, posts := l.pickPostings(opt.ReadTs)
 
+	x.SPEW.Dump("OPTIONS is ", opt)
+	x.SPEW.Dump("post is: ", posts)
 	var iw *roaring64.Bitmap
 	if opt.Intersect != nil {
 		iw = codec.FromList(opt.Intersect)

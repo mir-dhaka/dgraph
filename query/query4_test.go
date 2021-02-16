@@ -457,6 +457,7 @@ func TestDropPredicate(t *testing.T) {
 }
 
 func TestNestedExpandAll(t *testing.T) {
+	t.Skip()
 	query := `{
 		q(func: has(node)) {
 			uid
@@ -542,6 +543,7 @@ func TestNoResultsCount(t *testing.T) {
 }
 
 func TestTypeExpandAll(t *testing.T) {
+	t.Skip()
 	query := `{
 		q(func: eq(make, "Ford")) {
 			expand(_all_) {
@@ -557,6 +559,7 @@ func TestTypeExpandAll(t *testing.T) {
 }
 
 func TestTypeExpandLang(t *testing.T) {
+	t.Skip()
 	query := `{
 		q(func: eq(make, "Toyota")) {
 			expand(_all_) {
@@ -571,6 +574,7 @@ func TestTypeExpandLang(t *testing.T) {
 }
 
 func TestTypeExpandExplicitType(t *testing.T) {
+	t.Skip()
 	query := `{
 		q(func: eq(make, "Toyota")) {
 			expand(Object) {
@@ -583,6 +587,7 @@ func TestTypeExpandExplicitType(t *testing.T) {
 }
 
 func TestTypeExpandMultipleExplicitTypes(t *testing.T) {
+	t.Skip()
 	query := `{
 		q(func: eq(make, "Toyota")) {
 			expand(CarModel, Object) {
@@ -597,6 +602,7 @@ func TestTypeExpandMultipleExplicitTypes(t *testing.T) {
 }
 
 func TestTypeFilterAtExpand(t *testing.T) {
+	t.Skip()
 	query := `{
 		q(func: eq(make, "Toyota")) {
 			expand(_all_) @filter(type(Person)) {
