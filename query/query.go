@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/RoaringBitmap/roaring/roaring64"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	otrace "go.opencensus.io/trace"
@@ -926,7 +925,6 @@ func createTaskQuery(sg *SubGraph) (*pb.Query, error) {
 	}
 
 	if sg.OrderedUIDs != nil {
-		glog.Info("Creating task query sg.OrderedUIDs", sg.OrderedUIDs.Uids)
 		out.UidList = sg.OrderedUIDs
 	} else if sg.SrcUIDs != nil {
 		out.UidList = sg.SrcUIDs
@@ -977,13 +975,13 @@ func calculateFirstN(sg *SubGraph) int32 {
 // TODO(pawan) - Come back to this and document what do individual fields mean and when are they
 // populated.
 type varValue struct {
-	OrderedUIDs *pb.List
-	UidMap      *roaring64.Bitmap // list of uids if this denotes a uid variable.
-	Vals        map[uint64]types.Val
-	path        []*SubGraph // This stores the subgraph path from root to var definition.
+	UidMap *roaring64.Bitmap // list of uids if this denotes a uid variable.
+	Vals   map[uint64]types.Val
+	path   []*SubGraph // This stores the subgraph path from root to var definition.
 	// strList stores the valueMatrix corresponding to a predicate and is later used in
 	// expand(val(x)) query.
-	strList []*pb.ValueList
+	strList     []*pb.ValueList
+	OrderedUIDs *pb.List
 }
 
 func evalLevelAgg(
@@ -1489,14 +1487,11 @@ func (sg *SubGraph) populateUidValVar(doneVars map[string]varValue, sgPath []*Su
 		// Uid variable could be defined using uid or a predicate.
 		var uids *roaring64.Bitmap
 		if sg.Attr == "uid" {
-			glog.Info("UIDS here is: ", codec.FromList(sg.SrcUIDs))
 			uids = codec.FromList(sg.SrcUIDs)
 		} else {
 			// Avoid an upfront Clone.
 			sg.DestMap.SetCopyOnWrite(true)
 			uids = sg.DestMap
-			glog.Info("UIDS here is: ", uids.ToArray())
-			glog.Info("orderedUIds are", sg.OrderedUIDs)
 		}
 
 		if v, ok = doneVars[sg.Params.Var]; !ok {
@@ -1757,13 +1752,8 @@ func (sg *SubGraph) fillVars(mp map[string]varValue) error {
 		out.Or(sg.DestMap)
 	}
 
-	spew.Dump(lists)
 	if lists != nil {
 		sg.OrderedUIDs = algo.MergeSorted(lists)
-	}
-	glog.Info("RETURNING AFTER FILLING ", out.ToArray())
-	if sg.OrderedUIDs != nil {
-		glog.Info("RETURNING LIST ", sg.OrderedUIDs.Uids)
 	}
 	sg.DestMap = out
 	return nil
@@ -2076,7 +2066,6 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 				rch <- err
 				return
 			}
-			glog.Info("INTERSECTING sg.DestMap and sg.SrcMap")
 			codec.And(sg.DestMap, sg.SrcUIDs)
 			rch <- nil
 			return
@@ -2127,7 +2116,6 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 				rch <- err
 				return
 			}
-			x.SPEW.Dump("TaskQuery is", taskQuery)
 			result, err := worker.ProcessTaskOverNetwork(ctx, taskQuery)
 			switch {
 			case err != nil && strings.Contains(err.Error(), worker.ErrNonExistentTabletMessage):
@@ -2793,20 +2781,16 @@ func (req *Request) ProcessQuery(ctx context.Context) (err error) {
 			switch {
 			case sg.Params.Alias == "shortest":
 				// We allow only one shortest path block per query.
-				glog.Info("Called shortest")
 				go func() {
 					shortestSg, err = shortestPath(ctx, sg)
 					errChan <- err
 				}()
 			case sg.Params.Recurse:
-				glog.Info("Called recurse")
 				go func() {
 					errChan <- recurse(ctx, sg)
 				}()
 			default:
-				// x.SPEW.Dump("SUBGRAPH before ======================================", sg)
 				go ProcessGraph(ctx, sg, nil, errChan)
-				// x.SPEW.Dump("SUBGRAPH after ======================================", sg)
 			}
 		}
 
@@ -2826,7 +2810,6 @@ func (req *Request) ProcessQuery(ctx context.Context) (err error) {
 		for _, idx := range idxList {
 			sg := req.Subgraphs[idx]
 
-			glog.Info("Populating vars for idx: ", idx)
 			var sgPath []*SubGraph
 			if err := sg.populateVarMap(req.Vars, sgPath); err != nil {
 				return err

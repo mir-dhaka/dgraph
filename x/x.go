@@ -40,7 +40,6 @@ import (
 
 	"google.golang.org/grpc/peer"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/dgraph-io/badger/v3"
 	bo "github.com/dgraph-io/badger/v3/options"
 	badgerpb "github.com/dgraph-io/badger/v3/pb"
@@ -142,11 +141,6 @@ var (
 	GuardiansGroupUid uint64
 	// GrootUser Uid is Uid of groot user node.
 	GrootUserUid uint64
-	SPEW         = &spew.ConfigState{
-		Indent:                  "    ",
-		DisableCapacities:       true,
-		DisablePointerAddresses: true,
-	}
 )
 
 func init() {

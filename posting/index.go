@@ -1030,11 +1030,8 @@ func prefixesToDropCountIndex(ctx context.Context, rb *IndexRebuild) [][]byte {
 
 // rebuildCountIndex rebuilds the count index for a given attribute.
 func rebuildCountIndex(ctx context.Context, rb *IndexRebuild) error {
-	glog.Info("IN rebuild count index")
 	op := rb.needsCountIndexRebuild()
-	glog.Info("op is ", op)
 	if op != indexRebuild {
-		glog.Info("returning nil ", op)
 		return nil
 	}
 
