@@ -522,8 +522,6 @@ func (l *List) Bitmap(opt ListOptions) (*roaring64.Bitmap, error) {
 func (l *List) bitmap(opt ListOptions) (*roaring64.Bitmap, error) {
 	deleteBelow, posts := l.pickPostings(opt.ReadTs)
 
-	x.SPEW.Dump("OPTIONS is ", opt)
-	x.SPEW.Dump("post is: ", posts)
 	var iw *roaring64.Bitmap
 	if opt.Intersect != nil {
 		iw = codec.FromList(opt.Intersect)
@@ -768,24 +766,35 @@ func (l *List) IsEmpty(readTs, afterUid uint64) (bool, error) {
 
 func (l *List) getPostingAndLength(readTs, afterUid, uid uint64) (int, bool, *pb.Posting) {
 	l.AssertRLock()
+	var post *pb.Posting
 	var count int
 	var found bool
-	var post *pb.Posting
-	err := l.iterate(readTs, afterUid, func(p *pb.Posting) error {
+	var bm *roaring64.Bitmap
+	var err error
+
+	opt := ListOptions{
+		ReadTs:   readTs,
+		AfterUid: afterUid,
+	}
+	if bm, err = l.bitmap(opt); err != nil {
+		return -1, false, nil
+	}
+	count = int(bm.GetCardinality())
+	err = l.iterate(readTs, afterUid, func(p *pb.Posting) error {
 		if p.Uid == uid {
 			post = p
 			found = true
 		}
-		count++
 		return nil
 	})
 	if err != nil {
 		return -1, false, nil
 	}
-
 	return count, found, post
 }
 
+// This function is not used because it only returns the length on posting lists, doesn't include
+// UIDs
 func (l *List) length(readTs, afterUid uint64) int {
 	l.AssertRLock()
 	count := 0
@@ -803,7 +812,16 @@ func (l *List) length(readTs, afterUid uint64) int {
 func (l *List) Length(readTs, afterUid uint64) int {
 	l.RLock()
 	defer l.RUnlock()
-	return l.length(readTs, afterUid)
+
+	opt := ListOptions{
+		ReadTs:   readTs,
+		AfterUid: afterUid,
+	}
+	bm, err := l.Bitmap(opt)
+	if err != nil {
+		return -1
+	}
+	return int(bm.GetCardinality())
 }
 
 // Rollup performs the rollup process, merging the immutable and mutable layers

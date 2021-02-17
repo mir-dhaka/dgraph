@@ -2278,7 +2278,6 @@ func (qs *queryState) evaluate(cp countParams, out *pb.Result) error {
 		if err != nil {
 			return err
 		}
-		x.SPEW.Dump("COUNT UIDS:", uids)
 		out.UidMatrix = append(out.UidMatrix, uids)
 		return nil
 	}
