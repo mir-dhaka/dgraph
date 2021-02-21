@@ -19,10 +19,6 @@ package algo
 type elem struct {
 	val     uint64 // Value of this element.
 	listIdx int    // Which list this element comes from.
-
-	// The following fields are only used when merging pb.UidPack objects.
-	blockIdx  int      // The current position in the current pb.UidBlock object.
-	blockUids []uint64 // The current block.
 }
 
 type uint64Heap []elem

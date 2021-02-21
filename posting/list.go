@@ -560,12 +560,17 @@ func (l *List) bitmap(opt ListOptions) (*roaring64.Bitmap, error) {
 		}
 	}
 
+	prev := uint64(0)
 	for _, p := range posts {
+		if p.Uid == prev {
+			continue
+		}
 		if p.Op == Set {
 			r.Add(p.Uid)
 		} else if p.Op == Del {
 			r.Remove(p.Uid)
 		}
+		prev = p.Uid
 	}
 
 	codec.RemoveRange(r, 0, opt.AfterUid)

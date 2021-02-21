@@ -289,6 +289,7 @@ type SubGraph struct {
 	// destUIDs is a list of destination UIDs, after applying filters, pagination.
 	DestMap *roaring64.Bitmap
 
+	// OrderedUIDs is used to store the UIDs in some order, used for shortest path.
 	OrderedUIDs *pb.List
 	List        bool // whether predicate is of list type
 
@@ -924,6 +925,7 @@ func createTaskQuery(sg *SubGraph) (*pb.Query, error) {
 		First:        first,
 	}
 
+	// Use the orderedUIDs if present, it will only be present for the shortest path case.
 	if sg.OrderedUIDs != nil {
 		out.UidList = sg.OrderedUIDs
 	} else if sg.SrcUIDs != nil {
