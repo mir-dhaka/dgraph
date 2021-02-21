@@ -2750,11 +2750,9 @@ func (req *Request) ProcessQuery(ctx context.Context) (err error) {
 		errChan := make(chan error, len(req.Subgraphs))
 		var idxList []int
 
-		glog.Info("LOOPING FOR SUBGRAPH: ", i, " ATTR ", req.Subgraphs[0].Attr)
 		// If we have N blocks in a query, it can take a maximum of N iterations for all of them
 		// to be executed.
 		for idx := 0; idx < len(req.Subgraphs); idx++ {
-			glog.Info("INNER LOOP FOR SUBGRAPH: ", i, " ATTR ", req.Subgraphs[0].Attr, " idx: ", idx)
 			if hasExecuted[idx] {
 				continue
 			}

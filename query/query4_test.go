@@ -542,6 +542,7 @@ func TestNoResultsCount(t *testing.T) {
 	require.JSONEq(t, `{"data": {"q": []}}`, js)
 }
 
+// TODO(Ahsan): Fix expand all tests
 func TestTypeExpandAll(t *testing.T) {
 	t.Skip()
 	query := `{
