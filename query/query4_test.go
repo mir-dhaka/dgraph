@@ -457,7 +457,6 @@ func TestDropPredicate(t *testing.T) {
 }
 
 func TestNestedExpandAll(t *testing.T) {
-	t.Skip()
 	query := `{
 		q(func: has(node)) {
 			uid
