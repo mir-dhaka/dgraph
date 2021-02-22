@@ -798,8 +798,6 @@ func (l *List) getPostingAndLength(readTs, afterUid, uid uint64) (int, bool, *pb
 	return count, found, post
 }
 
-// This function is not used because it only returns the length on posting lists, doesn't include
-// UIDs
 func (l *List) length(readTs, afterUid uint64) int {
 	l.AssertRLock()
 	count := 0

@@ -1443,7 +1443,6 @@ func (sg *SubGraph) populateUidValVar(doneVars map[string]varValue, sgPath []*Su
 			Vals:        make(map[uint64]types.Val),
 			path:        sgPath,
 			strList:     sg.valueMatrix,
-			UidMap:      roaring64.New(),
 		}
 		for idx, uid := range sg.SrcUIDs.Uids {
 			val := types.Val{
@@ -1462,7 +1461,6 @@ func (sg *SubGraph) populateUidValVar(doneVars map[string]varValue, sgPath []*Su
 			Vals:        make(map[uint64]types.Val),
 			path:        sgPath,
 			strList:     sg.valueMatrix,
-			UidMap:      roaring64.New(),
 		}
 
 		// Because we are counting the number of UIDs in parent
@@ -1546,7 +1544,7 @@ func (sg *SubGraph) populateUidValVar(doneVars map[string]varValue, sgPath []*Su
 			path:        sgPath,
 			Vals:        make(map[uint64]types.Val),
 			strList:     sg.valueMatrix,
-			UidMap:      roaring64.NewBitmap(),
+			UidMap:      roaring64.New(),
 		}
 	}
 	return nil
