@@ -17,7 +17,6 @@
 package algo
 
 import (
-	"container/heap"
 	"sort"
 
 	"github.com/dgraph-io/dgraph/protos/pb"
@@ -44,54 +43,4 @@ func IndexOf(u *pb.List, uid uint64) int {
 		return i
 	}
 	return -1
-}
-
-// MergeSorted merges sorted lists.
-func MergeSorted(lists []*pb.List) *pb.List {
-	if len(lists) == 0 {
-		return new(pb.List)
-	}
-
-	h := &uint64Heap{}
-	heap.Init(h)
-	maxSz := 0
-
-	for i, l := range lists {
-		if l == nil {
-			continue
-		}
-		lenList := len(l.Uids)
-		if lenList > 0 {
-			heap.Push(h, elem{
-				val:     l.Uids[0],
-				listIdx: i,
-			})
-			if lenList > maxSz {
-				maxSz = lenList
-			}
-		}
-	}
-
-	// Our final output. Give it an approximate capacity as copies are expensive.
-	output := make([]uint64, 0, maxSz)
-	// idx[i] is the element we are looking at for lists[i].
-	idx := make([]int, len(lists))
-	var last uint64   // Last element added to sorted / final output.
-	for h.Len() > 0 { // While heap is not empty.
-		me := (*h)[0] // Peek at the top element in heap.
-		if len(output) == 0 || me.val != last {
-			output = append(output, me.val) // Add if unique.
-			last = me.val
-		}
-		l := lists[me.listIdx]
-		if idx[me.listIdx] >= len(l.Uids)-1 {
-			heap.Pop(h)
-		} else {
-			idx[me.listIdx]++
-			val := l.Uids[idx[me.listIdx]]
-			(*h)[0].val = val
-			heap.Fix(h, 0) // Faster than Pop() followed by Push().
-		}
-	}
-	return &pb.List{Uids: output}
 }

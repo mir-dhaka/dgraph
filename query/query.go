@@ -1690,7 +1690,6 @@ func (sg *SubGraph) fillVars(mp map[string]varValue) error {
 		}
 	}
 
-	var lists []*pb.List
 	out := roaring64.New()
 	// Go through all the variables in NeedsVar and see if we have a value for them in the map. If
 	// we do, then we store that value in the appropriate variable inside SubGraph.
@@ -1720,7 +1719,10 @@ func (sg *SubGraph) fillVars(mp map[string]varValue) error {
 
 		case (v.Typ == gql.AnyVar || v.Typ == gql.UidVar) && !l.UidMap.IsEmpty():
 			if l.OrderedUIDs != nil {
-				lists = append(lists, l.OrderedUIDs)
+				// TODO(Ahsan): There should only be one shortest path block in a query. So, we can
+				// assume the below assertion to hold. Need to double-check this.
+				x.AssertTrue(sg.OrderedUIDs == nil)
+				sg.OrderedUIDs = l.OrderedUIDs
 			}
 			out.Or(l.UidMap)
 
@@ -1752,9 +1754,6 @@ func (sg *SubGraph) fillVars(mp map[string]varValue) error {
 		out.Or(sg.DestMap)
 	}
 
-	if lists != nil {
-		sg.OrderedUIDs = algo.MergeSorted(lists)
-	}
 	sg.DestMap = out
 	return nil
 }

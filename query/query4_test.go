@@ -542,9 +542,7 @@ func TestNoResultsCount(t *testing.T) {
 	require.JSONEq(t, `{"data": {"q": []}}`, js)
 }
 
-// TODO(Ahsan): Fix expand all tests
 func TestTypeExpandAll(t *testing.T) {
-	t.Skip()
 	query := `{
 		q(func: eq(make, "Ford")) {
 			expand(_all_) {
@@ -560,7 +558,6 @@ func TestTypeExpandAll(t *testing.T) {
 }
 
 func TestTypeExpandLang(t *testing.T) {
-	t.Skip()
 	query := `{
 		q(func: eq(make, "Toyota")) {
 			expand(_all_) {
@@ -575,7 +572,6 @@ func TestTypeExpandLang(t *testing.T) {
 }
 
 func TestTypeExpandExplicitType(t *testing.T) {
-	t.Skip()
 	query := `{
 		q(func: eq(make, "Toyota")) {
 			expand(Object) {
@@ -588,7 +584,6 @@ func TestTypeExpandExplicitType(t *testing.T) {
 }
 
 func TestTypeExpandMultipleExplicitTypes(t *testing.T) {
-	t.Skip()
 	query := `{
 		q(func: eq(make, "Toyota")) {
 			expand(CarModel, Object) {
@@ -603,7 +598,6 @@ func TestTypeExpandMultipleExplicitTypes(t *testing.T) {
 }
 
 func TestTypeFilterAtExpand(t *testing.T) {
-	t.Skip()
 	query := `{
 		q(func: eq(make, "Toyota")) {
 			expand(_all_) @filter(type(Person)) {

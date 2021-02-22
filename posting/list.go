@@ -813,9 +813,6 @@ func (l *List) length(readTs, afterUid uint64) int {
 
 // Length iterates over the mutation layer and counts number of elements.
 func (l *List) Length(readTs, afterUid uint64) int {
-	l.RLock()
-	defer l.RUnlock()
-
 	opt := ListOptions{
 		ReadTs:   readTs,
 		AfterUid: afterUid,
