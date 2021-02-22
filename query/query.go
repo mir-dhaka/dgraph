@@ -2209,7 +2209,11 @@ func ProcessGraph(ctx context.Context, sg, parent *SubGraph, rch chan error) {
 			sg.DestMap = roaring64.ParOr(4, bitmaps...)
 		case sg.FilterOp == "not":
 			x.AssertTrue(len(sg.Filters) == 1)
-			sg.DestMap.AndNot(sg.Filters[0].DestMap)
+			if sg.Filters[0].DestMap == nil {
+				sg.DestMap.AndNot(roaring64.New())
+			} else {
+				sg.DestMap.AndNot(sg.Filters[0].DestMap)
+			}
 		case sg.FilterOp == "and":
 			if hasNils {
 				sg.DestMap = roaring64.New()
