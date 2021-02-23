@@ -756,27 +756,24 @@ loop:
 
 // IsEmpty returns true if there are no uids at the given timestamp after the given UID.
 func (l *List) IsEmpty(readTs, afterUid uint64) (bool, error) {
-	l.RLock()
-	defer l.RUnlock()
-	var count int
-	err := l.iterate(readTs, afterUid, func(p *pb.Posting) error {
-		count++
-		return ErrStopIteration
-	})
-	if err != nil {
-		return false, errors.Wrapf(err, "cannot iterate over list when calling List.IsEmpty")
+	opt := ListOptions{
+		ReadTs:   readTs,
+		AfterUid: afterUid,
 	}
-	return count == 0, nil
+	bm, err := l.Bitmap(opt)
+	if err != nil {
+		return false, errors.Wrapf(err, "Failed to get the bitmap")
+	}
+	return bm.GetCardinality() == 0, nil
 }
 
 func (l *List) getPostingAndLength(readTs, afterUid, uid uint64) (int, bool, *pb.Posting) {
 	l.AssertRLock()
 	var post *pb.Posting
-	var count int
-	var found bool
 	var bm *roaring64.Bitmap
 	var err error
 
+	foundPosting := false
 	opt := ListOptions{
 		ReadTs:   readTs,
 		AfterUid: afterUid,
@@ -784,16 +781,22 @@ func (l *List) getPostingAndLength(readTs, afterUid, uid uint64) (int, bool, *pb
 	if bm, err = l.bitmap(opt); err != nil {
 		return -1, false, nil
 	}
-	count = int(bm.GetCardinality())
+	count := int(bm.GetCardinality())
+	found := bm.Contains(uid)
+
 	err = l.iterate(readTs, afterUid, func(p *pb.Posting) error {
 		if p.Uid == uid {
 			post = p
-			found = true
+			foundPosting = true
 		}
 		return nil
 	})
 	if err != nil {
 		return -1, false, nil
+	}
+
+	if found && !foundPosting {
+		post = &pb.Posting{Uid: uid}
 	}
 	return count, found, post
 }
