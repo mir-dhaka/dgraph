@@ -19,6 +19,7 @@ package worker
 import (
 	"bytes"
 	"context"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -630,7 +631,35 @@ func retrieveValuesAndFacets(args funcArgs, pl *posting.List, facetsTree *facets
 func facetsFilterUidPostingList(pl *posting.List, facetsTree *facetsTree, opts posting.ListOptions,
 	fn func(*pb.Posting)) error {
 
-	return pl.Postings(opts, func(p *pb.Posting) error {
+	var bm *roaring64.Bitmap
+	var err error
+	bm, err = pl.Bitmap(opts)
+	if err != nil {
+		return err
+	}
+	uids := bm.ToArray()
+	idx := 0
+
+	processUids := func(puid uint64) error {
+		for idx < len(uids) && uids[idx] < puid {
+			p := &pb.Posting{Uid: uids[idx]}
+			pick, err := applyFacetsTree(p.Facets, facetsTree)
+			if err != nil {
+				return err
+			}
+			if pick {
+				fn(p)
+			}
+			idx++
+		}
+		return nil
+	}
+
+	err = pl.Postings(opts, func(p *pb.Posting) error {
+		err := processUids(p.Uid)
+		if err != nil {
+			return err
+		}
 		// If filterTree is nil, applyFacetsTree returns true and nil error.
 		pick, err := applyFacetsTree(p.Facets, facetsTree)
 		if err != nil {
@@ -639,8 +668,16 @@ func facetsFilterUidPostingList(pl *posting.List, facetsTree *facetsTree, opts p
 		if pick {
 			fn(p)
 		}
+		idx++
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	if err := processUids(math.MaxUint64); err != nil {
+		return err
+	}
+	return nil
 }
 
 func countForUidPostings(args funcArgs, pl *posting.List, facetsTree *facetsTree,
@@ -665,7 +702,6 @@ func retrieveUidsAndFacets(args funcArgs, pl *posting.List, facetsTree *facetsTr
 	uidList := &pb.List{
 		Uids: make([]uint64, 0, pl.ApproxLen()), // preallocate uid slice.
 	}
-
 	err := facetsFilterUidPostingList(pl, facetsTree, opts, func(p *pb.Posting) {
 		uidList.Uids = append(uidList.Uids, p.Uid)
 		if q.FacetParam != nil {
